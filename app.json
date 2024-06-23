@@ -4,7 +4,7 @@
     "slug": "ibsPortosPrivados",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/iconAtp.png",
+    "icon": "./assets/iconeAtp.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splashAtp.png",

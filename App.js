@@ -1,19 +1,24 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Text, View, ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, Image, BackHandler } from 'react-native';
+import { Text, View, ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, Image, BackHandler, Dimensions } from 'react-native';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import axios from 'axios';
 import { WebView } from 'react-native-webview';
 import { Ionicons, Foundation, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
+import ContentLoader, { Rect } from "react-content-loader/native"
 
 
-function WebViewScreen({ route }) {
+const WebViewScreen = ({ route }) => {
+  const { width } = Dimensions.get('window');
   const webViewRef = useRef(null);
   const navigation = useNavigation();
   const routeScreen = route.params.list ? route.params : route.params.params;
 
-  //Ipedir o zoom no webview
+  const [isLoading, setLoading] = useState(true);
+  const [isInternalLoading, setInternalLoading] = useState(false);
+
+  // Impedir o zoom no WebView
   const injectedJavaScript = `
     const meta = document.createElement('meta');
     meta.setAttribute('name', 'viewport');
@@ -37,18 +42,75 @@ function WebViewScreen({ route }) {
     return () => backHandler.remove();
   }, [routeScreen?.title, navigation]);
 
-  return (
-  <WebView 
-    ref={webViewRef} 
-    source={{ uri: routeScreen.url }} 
-    style={{ flex: 1 }}
-    injectedJavaScript={injectedJavaScript}
-    scalesPageToFit={false}
-    javaScriptEnabled={true}
-    domStorageEnabled={true}
-  />
+  const onLoadStart = () => {
+    setInternalLoading(true); // Inicia o estado de carregamento interno
+  };
+
+  const onLoadEnd = () => {
+    setInternalLoading(false); // Termina o estado de carregamento interno
+    setLoading(false); // Termina o estado de carregamento quando o WebView termina de carregar
+  };
+
+  const renderLoadingIndicator = () => (
+    <ContentLoader
+    viewBox={`0 0 ${width} 600`}
+      height="600"
+      width={width}
+      backgroundColor="#f0f0f0"
+      foregroundColor="#e0e0e0"
+      padding="50"
+    >
+      {/* Header */}
+      <Rect x="0" y="0" rx="4" ry="4" width={width} height="40" />
+      
+      {/* Profile Picture */}
+      <Rect x="10" y="60" rx="50" ry="50" width="100" height="100" />
+      
+      {/* Title */}
+      <Rect x="130" y="80" rx="4" ry="4" width="200" height="20" />
+      <Rect x="130" y="110" rx="4" ry="4" width="150" height="15" />
+      
+      {/* Paragraphs */}
+      <Rect x="0" y="200" rx="4" ry="4" width={width - 20} height="10" />
+      <Rect x="0" y="220" rx="4" ry="4" width={width - 40} height="10" />
+      <Rect x="0" y="240" rx="4" ry="4" width={width - 60} height="10" />
+      <Rect x="0" y="260" rx="4" ry="4" width={width - 80} height="10" />
+      
+      {/* Image */}
+      <Rect x="0" y="290" rx="4" ry="4" width={width} height="200" />
+      
+      {/* More Paragraphs */}
+      <Rect x="0" y="510" rx="4" ry="4" width={width - 20} height="10" />
+      <Rect x="0" y="530" rx="4" ry="4" width={width - 40} height="10" />
+      <Rect x="0" y="550" rx="4" ry="4" width={width - 60} height="10" />
+    </ContentLoader>
   );
-}
+  
+
+  let styleWebview = isLoading ? {display:'none'} : {flex:1}
+
+  return (
+    <View style={styles.container}>
+      {isLoading && ( // Mostra o indicador de atividade enquanto isLoading for true
+        <View style={styles.loadingContainer}>
+            {renderLoadingIndicator()}
+        </View>
+      )}
+      <WebView
+        ref={webViewRef}
+        source={{ uri: routeScreen.url }}
+        style={styleWebview}
+        injectedJavaScript={injectedJavaScript}
+        onLoadStart={onLoadStart} // Evento disparado quando o WebView começa a carregar
+        onLoadEnd={onLoadEnd} // Evento disparado quando o WebView termina de carregar
+        scalesPageToFit={false}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        startInLoadingState={isInternalLoading} // Inicia o estado de carregamento interno
+      />
+    </View>
+  );
+};
 
 function DynamicScreen({ route }) {
   const navigation = useNavigation();
@@ -66,14 +128,14 @@ function DynamicScreen({ route }) {
 }
 
 function ListScreen({route}) {
-  console.error(route)
+  const config = route.params.config??{iconeColor:'#000'};
   const routeScreen = route.params.list ? route.params : route.params.params
-
+//console.error(route)
 
   const navigation = useNavigation();
   useEffect(() => {
     if (routeScreen?.title) {
-      navigation.setOptions({ title: routeScreen.title });
+      navigation.setOptions({ title: routeScreen.title, headerTintColor: routeScreen.color});
     }
   }, [routeScreen?.title]);
 
@@ -94,26 +156,26 @@ function ListScreen({route}) {
       keyExtractor={(item, index) => index.toString()}
       renderItem={({ item }) => (
         <TouchableOpacity
-          style={styles.listItem}
+          style={config.listStyle??styles.listItem}
           onPress={() => {
             if (item.target?.params) {
               switch (item.target.type) {
                 case 'webview':
-                  navigation.navigate('WebView', { url: item.target.params.url, list: true, title: item.target.params.title });
+                  navigation.navigate('WebView', { url: item.target.params.url, list: true, title: item.target.params.title, config:item.target.params.config });
                   break;
                 case 'dynamic':
-                  navigation.navigate('Dynamic', { content: item.target.params.content, list:true, title: item.target.params.title });
+                  navigation.navigate('Dynamic', { content: item.target.params.content, list:true, title: item.target.params.title, config:item.target.params.config });
                   break;
                 case 'list':
-                  navigation.navigate('List', { items: item.target.params.items, list: true, title: item.target.params.title });
+                  navigation.navigate('List', { items: item.target.params.items, list: true, title: item.target.params.title, config:item.target.params.config });
                   break
               }
             }
           }}
         >
         
-          <IconesApp {...{ name:item.icon, size:30, color:"black", type:item.iconType }} />
-          <Text style={styles.listItemText}>{item.title}</Text>
+          <IconesApp {...{ name:item.icon, size:30, color:config.iconeColor, type:item.iconType }} />
+          <Text style={config.textStyle??styles.listItemText}>{item.title}</Text>
         </TouchableOpacity>
       )}
     />
@@ -204,10 +266,10 @@ function App({ tabConfig, config }) {
               headerTitleContainerStyle: {
                 paddingVertical:0,
               },
-              headerTintColor:"red",
+              headerTintColor:"",
               headerTitleAlign: 'center',
               headerStyle: {
-
+    
               },
               tabBarActiveTintColor: config.tabColor,
               tabBarInactiveTintColor: config.tabInativeColor,
@@ -282,10 +344,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   container: {
-    flex: 1,
-    backgroundColor: 'white',
+    flex: 1
   },
-  webview: {
-    flex: 1,
+  loadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff', // Fundo semitransparente para cobrir o WebView
+    paddingHorizontal: 20
   },
 });
