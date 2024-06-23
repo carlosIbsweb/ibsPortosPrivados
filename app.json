@@ -1,27 +1,34 @@
 {
   "expo": {
-    "name": "ibsPortosPrivados",
+    "name": "Portos Privados",
     "slug": "ibsPortosPrivados",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/iconAtp.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splashAtp.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#3a5d8a"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      }
+        "foregroundImage": "./assets/adaptive-iconAtp.png",
+        "backgroundColor": "#3a5d8a"
+      },
+      "package": "com.carlosibs.ibsPortosPrivados"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c5c1224f-c8db-44b7-a49f-d2d93f75abfc"
+      }
+    },
+    "owner": "carlosibs"
   }
 }

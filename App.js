@@ -1,26 +1,83 @@
-import React, { useEffect, useState } from 'react';
-import { Text, View, ActivityIndicator, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect, useState, useRef } from 'react';
+import { Text, View, ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, Image, BackHandler } from 'react-native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import axios from 'axios';
 import { WebView } from 'react-native-webview';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Foundation, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
+
 
 function WebViewScreen({ route }) {
-  return <WebView source={{ uri: route.params.url }} style={{ flex: 1 }} />;
+  const webViewRef = useRef(null);
+  const navigation = useNavigation();
+  const routeScreen = route.params.list ? route.params : route.params.params;
+
+  //Ipedir o zoom no webview
+  const injectedJavaScript = `
+    const meta = document.createElement('meta');
+    meta.setAttribute('name', 'viewport');
+    meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+    document.getElementsByTagName('head')[0].appendChild(meta);
+  `;
+
+  useEffect(() => {
+    if (routeScreen?.title) {
+      navigation.setOptions({ title: routeScreen.title });
+    }
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (webViewRef.current) {
+        webViewRef.current.goBack();
+        return true;
+      }
+      return false;
+    });
+
+    return () => backHandler.remove();
+  }, [routeScreen?.title, navigation]);
+
+  return (
+  <WebView 
+    ref={webViewRef} 
+    source={{ uri: routeScreen.url }} 
+    style={{ flex: 1 }}
+    injectedJavaScript={injectedJavaScript}
+    scalesPageToFit={false}
+    javaScriptEnabled={true}
+    domStorageEnabled={true}
+  />
+  );
 }
 
 function DynamicScreen({ route }) {
+  const navigation = useNavigation();
+  useEffect(() => {
+    if (route.params?.title) {
+      navigation.setOptions({ title: route.params.title });
+    }
+  }, [route.params?.title]);
+
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} >
       <Text>{route.params.content}</Text>
     </View>
   );
 }
 
-function ListScreen({ route, navigation }) {
-  const items = route.params?.items || []; // Handle the case when items are undefined
+function ListScreen({route}) {
+  console.error(route)
+  const routeScreen = route.params.list ? route.params : route.params.params
+
+
+  const navigation = useNavigation();
+  useEffect(() => {
+    if (routeScreen?.title) {
+      navigation.setOptions({ title: routeScreen.title });
+    }
+  }, [routeScreen?.title]);
+
+  const items = routeScreen?.items || []; // Handle the case when items are undefined
 
   if (items.length === 0) {
     return (
@@ -29,6 +86,7 @@ function ListScreen({ route, navigation }) {
       </View>
     );
   }
+
 
   return (
     <FlatList
@@ -41,26 +99,45 @@ function ListScreen({ route, navigation }) {
             if (item.target?.params) {
               switch (item.target.type) {
                 case 'webview':
-                  navigation.navigate('WebView', { url: item.target.params.url });
+                  navigation.navigate('WebView', { url: item.target.params.url, list: true, title: item.target.params.title });
                   break;
                 case 'dynamic':
-                  navigation.navigate('Dynamic', { content: item.target.params.content });
+                  navigation.navigate('Dynamic', { content: item.target.params.content, list:true, title: item.target.params.title });
                   break;
                 case 'list':
-                  navigation.navigate('List', { items: item.target.params.items });
-                  break;
-                default:
-                  break;
+                  navigation.navigate('List', { items: item.target.params.items, list: true, title: item.target.params.title });
+                  break
               }
             }
           }}
         >
-          <Ionicons name={item.icon} size={24} color="black" />
+        
+          <IconesApp {...{ name:item.icon, size:30, color:"black", type:item.iconType }} />
           <Text style={styles.listItemText}>{item.title}</Text>
         </TouchableOpacity>
       )}
     />
   );
+}
+
+function IconesApp(props){
+
+  switch(props.type){
+
+    case 'Ionicons':
+      return <Ionicons name={props.name} size={props.size} color={props.color} />
+      break;
+      case 'Foundation':
+        return <Foundation name={props.name} size={props.size} color={props.color} />
+        break;
+      case 'FontAwesome':
+        return <FontAwesome name={props.name} size={props.size} color={props.color} />
+        break
+      case 'MaterialCommunityIcons':
+        return <MaterialCommunityIcons name={props.name} size={props.size} color={props.color} />
+        break
+  }
+
 }
 
 const HomeStack = createNativeStackNavigator();
@@ -70,32 +147,48 @@ function DynamicStackScreen({ route }) {
 
   return (
     <HomeStack.Navigator>
-      <HomeStack.Screen name="List" component={ListScreen} />
-      <HomeStack.Screen name="WebView" component={WebViewScreen} />
-      <HomeStack.Screen name="Dynamic" component={DynamicScreen} />
       {screenConfig.map((screen, index) => (
         <HomeStack.Screen
-          key={index}
+          initialParams={screen}
+          key={index} 
           name={screen.name}
-          component={ListScreen} // Using ListScreen as the base component
-          initialParams={screen.params}
+          options={{title:screen.title, headerShown: screen?.header}}
+          component={screen.type == 'list' ? ListScreen : screen.type == 'webview' ? WebViewScreen : DynamicScreen} // Using ListScreen as the base component
+          
         />
       ))}
+       <HomeStack.Screen name="List" component={ListScreen}/>
+      <HomeStack.Screen name="WebView" component={WebViewScreen} />
+      <HomeStack.Screen name="Dynamic" component={DynamicScreen} />
     </HomeStack.Navigator>
+  );
+}
+
+function LogoTitle(props) {
+
+  return (
+    <View style={styles.logoContainer}>
+      <Image
+            style={{ width:  120,height: 50 }}
+            source={{ uri: props.logo}}
+            resizeMode="contain"
+          />
+    </View>
+    
   );
 }
 
 const Tab = createBottomTabNavigator();
 
-function App({ tabConfig }) {
+function App({ tabConfig, config }) {
   return (
     <NavigationContainer>
       <Tab.Navigator
         screenOptions={({ route }) => ({
-          tabBarIcon: ({ color, size }) => {
+          tabBarIcon: ({ color, size, iconType }) => {
             const tab = tabConfig.find(tab => tab.name === route.name);
-            const icon = tab?.icon || 'md-alert'; // Use a default icon if not found
-            return <Ionicons name={icon} size={size} color={color} />;
+            const icon = tab?.icon || 'md-alert'; // Use a default icon if not found 
+            return <IconesApp {...{ name:icon, size:size, color:color, type:tab.iconType }} />
           },
           tabBarActiveTintColor: 'tomato',
           tabBarInactiveTintColor: 'gray',
@@ -106,7 +199,22 @@ function App({ tabConfig }) {
             key={index}
             name={tab.name}
             component={DynamicStackScreen}
-            initialParams={{ screenConfig: tab.screens }}
+            options={{
+              headerTitle: (props) => <LogoTitle {...{logo:config.logo}} />,
+              headerTitleContainerStyle: {
+                paddingVertical:0,
+              },
+              headerTintColor:"red",
+              headerTitleAlign: 'center',
+              headerStyle: {
+
+              },
+              tabBarActiveTintColor: config.tabColor,
+              tabBarInactiveTintColor: config.tabInativeColor,
+              tabBarActiveBackgroundColor: config.tabBackColor,
+              tabBarInactiveBackgroundColor: config.tabInativeBackColor,
+            }}
+            initialParams={{ screenConfig: tab.screens,config: config }}
           />
         ))}
       </Tab.Navigator>
@@ -117,11 +225,13 @@ function App({ tabConfig }) {
 export default function AppWrapper() {
   const [isLoading, setIsLoading] = useState(true);
   const [tabConfig, setTabConfig] = useState([]);
+  const [config, setConfig] = useState([]);
 
   useEffect(() => {
     axios.get('https://portosprivados.org.br/api.php')
       .then(response => {
         setTabConfig(response.data.tabs || []); // Handle case when tabs are undefined
+        setConfig(response.data.config || []); // Handle case when tabs are undefined
         setIsLoading(false);
       })
       .catch(error => {
@@ -146,7 +256,7 @@ export default function AppWrapper() {
     );
   }
 
-  return <App tabConfig={tabConfig} />;
+  return <App tabConfig={tabConfig} config={config}/>;
 }
 
 const styles = StyleSheet.create({
@@ -164,5 +274,18 @@ const styles = StyleSheet.create({
   },
   listItemText: {
     marginLeft: 10,
+  },
+  logoContainer: {
+    flex:1,
+    flexDirection:'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  webview: {
+    flex: 1,
   },
 });
